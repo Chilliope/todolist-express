@@ -54,3 +54,21 @@ exports.updateTodolistStatus = async (req, res) => {
     res.status(500).json({ message: 'Failed to update todolist', error });
   }
 }
+
+exports.deleteTodolist = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const todo = await Todolist.findByPk(id);
+
+    if (!todo) {
+      return res.status(404).json({ message: 'Todolist not found' });
+    }
+
+    await todo.destroy();
+
+    res.status(204).json();
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update todolist', error });
+  }
+}
