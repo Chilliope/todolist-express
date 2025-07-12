@@ -1,74 +1,71 @@
-const { Todolist } = require('../models')
+const Todolist = require('../models/todolist');
 
 exports.getAllTodolists = async (req, res) => {
-    const todolists = await Todolist.findAll()
-    res.json(todolists)
-}
-
-exports.createTodolist = async (req, res) => {
-  const { todolist } = req.body;
-  const newTodolist = await Todolist.create({ todolist });
-  res.json(newTodolist);
+  try {
+    const todos = await Todolist.findAll({
+      where: { userId: req.user.id },
+    });
+    res.json(todos);
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengambil todolist' });
+  }
 };
 
-exports.updateTodolist = async (req, res) => {
-  const { id } = req.params;
-  const { todolist } = req.body;
-
+exports.createTodolist = async (req, res) => {
   try {
-    const todo = await Todolist.findByPk(id);
+    const todo = await Todolist.create({
+      todolist: req.body.todolist,
+      status: 'unchecked',
+      userId: req.user.id,
+    });
+    res.json(todo);
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal menambahkan todolist' });
+  }
+};
 
-    if (!todo) {
-      return res.status(404).json({ message: 'Todolist not found' });
-    }
+// Pastikan update dan delete juga hanya untuk milik user yg login:
+exports.updateTodolist = async (req, res) => {
+  try {
+    const todo = await Todolist.findOne({
+      where: { id: req.params.id, userId: req.user.id },
+    });
+    if (!todo) return res.status(404).json({ message: 'Todo tidak ditemukan' });
 
-    todo.todolist = todolist;
+    todo.todolist = req.body.todolist;
     await todo.save();
 
     res.json(todo);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update todolist', error });
+    res.status(500).json({ message: 'Gagal mengupdate todo' });
   }
 };
 
 exports.updateTodolistStatus = async (req, res) => {
-  const { id } = req.params;
-
   try {
-    const todo = await Todolist.findByPk(id);
+    const todo = await Todolist.findOne({
+      where: { id: req.params.id, userId: req.user.id },
+    });
+    if (!todo) return res.status(404).json({ message: 'Todo tidak ditemukan' });
 
-    if(todo.status === 'unchecked') {
-        todo.status = 'checked'
-    } else {
-        todo.status = 'unchecked'
-    }
-
-    if (!todo) {
-      return res.status(404).json({ message: 'Todolist not found' });
-    }
-
+    todo.status = req.body.status;
     await todo.save();
 
     res.json(todo);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update todolist', error });
+    res.status(500).json({ message: 'Gagal mengubah status' });
   }
-}
+};
 
 exports.deleteTodolist = async (req, res) => {
-  const { id } = req.params;
-
   try {
-    const todo = await Todolist.findByPk(id);
+    const deleted = await Todolist.destroy({
+      where: { id: req.params.id, userId: req.user.id },
+    });
+    if (!deleted) return res.status(404).json({ message: 'Todo tidak ditemukan' });
 
-    if (!todo) {
-      return res.status(404).json({ message: 'Todolist not found' });
-    }
-
-    await todo.destroy();
-
-    res.status(204).json();
+    res.json({ message: 'Berhasil dihapus' });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update todolist', error });
+    res.status(500).json({ message: 'Gagal menghapus todo' });
   }
-}
+};

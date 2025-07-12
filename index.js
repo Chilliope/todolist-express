@@ -1,66 +1,85 @@
+// core
 const express = require('express');
-const app = express();
-const todolistRoutes = require('./routes/todolistRoutes');
+const session = require('express-session');
 const cors = require('cors');
 const passport = require("passport");
-const session = require('express-session'); 
-
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
+
+// app init
+const app = express();
+
+// config
 require("./config/passport");
+
+// middleware
+app.use(express.json());
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.FRONTEND_URL
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // allow server-to-server / curl
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
 
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
-  saveUninitialized: true
+  saveUninitialized: true,
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Route Login
+// routes
+const todolistRoutes = require('./routes/todolistRoutes');
+app.use('/api/todolist', todolistRoutes);
+
+// auth routes
 app.get("/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
-// Callback dari Google
 app.get("/auth/google/callback",
   passport.authenticate("google", { failureRedirect: "/" }),
   (req, res) => {
-    res.redirect("/profile");
+    const frontendUrl = process.env.FRONTEND_URL;
+
+    const token = jwt.sign(
+      {
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.redirect(`${frontendUrl}/?token=${token}`);
   }
 );
 
-// Route Profile
 app.get("/profile", (req, res) => {
-  if (!req.isAuthenticated()) return res.redirect("/auth/google");
-  res.send(req.user); // Menampilkan data user dari Google
+  if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+  res.json(req.user);
 });
 
-// Logout
 app.get("/logout", (req, res) => {
   req.logout(() => {
-    res.redirect("/");
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid"); 
+      res.json({ message: "Logged out" });
+    });
   });
 });
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://shoes-yale-cabinet-cardiovascular.trycloudflare.com'
-];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('Not allowed by CORS'));
-    }
-  }
-}));
-
-app.use(express.json());
-
-app.use('/api/todolist', todolistRoutes)
-
+// export app
 module.exports = app;
