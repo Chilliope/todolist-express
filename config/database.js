@@ -1,4 +1,4 @@
-require('dotenv').config(); // import dotenv di paling atas
+require('dotenv').config(); 
 const { Sequelize } = require('sequelize');
 
 const sequelize = new Sequelize(
